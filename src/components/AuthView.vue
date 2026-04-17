@@ -2,26 +2,46 @@
 import { ref } from 'vue'
 import { useAppStore } from '../stores/app'
 import { Mail, Lock, User, ArrowRight, Sparkles } from 'lucide-vue-next'
+import { login, register } from '../services/backend'
 
 const store = useAppStore()
 
 const isLogin = ref(true)
 const isLoading = ref(false)
 
-const email = ref('')
+const userName = ref('')
 const password = ref('')
 const name = ref('')
+const avatar = ref('')
+const errorText = ref('')
 
-const handleSubmit = () => {
-  if (!email.value || !password.value || (!isLogin.value && !name.value)) return
-  
+const handleSubmit = async () => {
+  errorText.value = ''
+  if (!userName.value || !password.value || (!isLogin.value && !name.value)) return
   isLoading.value = true
-  
-  // Simulate network request
-  setTimeout(() => {
+
+  try {
+    if (isLogin.value) {
+      const data = await login({
+        user_name: userName.value.trim(),
+        password: password.value
+      })
+      store.login({ token: data.token, userId: data.user_id, userName: userName.value.trim() })
+    } else {
+      await register({
+        user_name: userName.value.trim(),
+        password: password.value,
+        nickname: name.value.trim(),
+        avatar: avatar.value.trim(),
+      })
+      isLogin.value = true
+      errorText.value = '注册成功，请登录'
+    }
+  } catch (error) {
+    errorText.value = error instanceof Error ? error.message : '请求失败，请稍后再试'
+  } finally {
     isLoading.value = false
-    store.login()
-  }, 1200)
+  }
 }
 </script>
 
@@ -112,11 +132,24 @@ const handleSubmit = () => {
               <div class="absolute inset-y-0 left-4 flex items-center pointer-events-none transition-colors group-focus-within:text-blue-500" :class="store.isDark ? 'text-slate-500' : 'text-slate-400'">
                 <Mail class="w-5 h-5" />
               </div>
-              <input 
-                v-model="email"
-                type="email" 
-                placeholder="Email Address" 
+              <input
+                v-model="userName"
+                type="text"
+                placeholder="Username"
                 required
+                class="w-full pl-12 pr-4 py-4 rounded-2xl border-2 outline-none font-semibold transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 placeholder-slate-400"
+                :class="store.isDark ? 'bg-slate-800/50 border-slate-700 text-white' : 'bg-white border-slate-100 text-slate-900 hover:border-slate-200'"
+              />
+            </div>
+
+            <div v-if="!isLogin" class="relative group animate-in slide-in-from-top-4 fade-in duration-500">
+              <div class="absolute inset-y-0 left-4 flex items-center pointer-events-none transition-colors group-focus-within:text-blue-500" :class="store.isDark ? 'text-slate-500' : 'text-slate-400'">
+                <User class="w-5 h-5" />
+              </div>
+              <input
+                v-model="avatar"
+                type="text"
+                placeholder="Avatar URL (optional)"
                 class="w-full pl-12 pr-4 py-4 rounded-2xl border-2 outline-none font-semibold transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 placeholder-slate-400"
                 :class="store.isDark ? 'bg-slate-800/50 border-slate-700 text-white' : 'bg-white border-slate-100 text-slate-900 hover:border-slate-200'"
               />
@@ -142,7 +175,7 @@ const handleSubmit = () => {
               </button>
             </div>
 
-            <button 
+            <button
               type="submit"
               :disabled="isLoading"
               class="w-full py-4 mt-2 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center justify-center gap-2 transition-all shadow-xl shadow-blue-500/30 hover:shadow-blue-500/50 hover:-translate-y-0.5 disabled:opacity-70 disabled:pointer-events-none overflow-hidden relative group"
@@ -151,6 +184,10 @@ const handleSubmit = () => {
               <span class="relative z-10">{{ isLoading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account') }}</span>
               <ArrowRight v-if="!isLoading" class="relative z-10 w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
+
+            <p v-if="errorText" class="text-xs font-semibold text-red-500 mt-3">
+              {{ errorText }}
+            </p>
           </form>
 
           <div class="mt-8 text-center">

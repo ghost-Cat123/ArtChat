@@ -5,6 +5,9 @@ export type NavTab = 'messages' | 'contacts' | 'ai'
 
 export const useAppStore = defineStore('app', () => {
   const isAuthenticated = ref(false)
+  const token = ref('')
+  const currentUserId = ref<number | null>(null)
+  const currentUserName = ref('')
   const isSidebarExpanded = ref(false)
   const activeTab = ref<NavTab>('messages')
   const activeId = ref('ai-assistant')
@@ -17,10 +20,10 @@ export const useAppStore = defineStore('app', () => {
   ])
 
   const chats = ref([
-    { id: 'chat-1', name: 'Design Team', lastMsg: 'The new minimalist UI looks great!', time: '10:24', avatar: '🎨', online: true, pinned: false },
-    { id: 'chat-2', name: 'Emily Davis', lastMsg: 'Are we still meeting at 2 PM?', time: 'Yesterday', avatar: '👩‍💻', online: true, pinned: false },
-    { id: 'chat-3', name: 'John Doe', lastMsg: 'Attached the project documentation.', time: 'Monday', avatar: '👨‍💼', online: false, pinned: false },
-    { id: 'chat-4', name: 'Art & Tech Hub', lastMsg: 'Check out the latest AI tools.', time: 'Oct 24', avatar: '🚀', online: false, pinned: false },
+    { id: 'user-10001', userId: 10001, name: 'Design Team', lastMsg: 'The new minimalist UI looks great!', time: '10:24', avatar: '🎨', online: true, pinned: false },
+    { id: 'user-10002', userId: 10002, name: 'Emily Davis', lastMsg: 'Are we still meeting at 2 PM?', time: 'Yesterday', avatar: '👩‍💻', online: true, pinned: false },
+    { id: 'user-10003', userId: 10003, name: 'John Doe', lastMsg: 'Attached the project documentation.', time: 'Monday', avatar: '👨‍💼', online: false, pinned: false },
+    { id: 'user-10004', userId: 10004, name: 'Art & Tech Hub', lastMsg: 'Check out the latest AI tools.', time: 'Oct 24', avatar: '🚀', online: false, pinned: false },
   ])
 
   const contactCategories = ref([
@@ -150,6 +153,9 @@ export const useAppStore = defineStore('app', () => {
 
   return {
     isAuthenticated,
+    token,
+    currentUserId,
+    currentUserName,
     isSidebarExpanded,
     activeTab,
     activeId,
@@ -173,8 +179,18 @@ export const useAppStore = defineStore('app', () => {
     sortedAIHistory,
     sortedChats,
     toggleSidebar,
-    login: () => isAuthenticated.value = true,
-    logout: () => isAuthenticated.value = false,
+    login: (payload: { token: string; userId: number; userName: string }) => {
+      token.value = payload.token
+      currentUserId.value = payload.userId
+      currentUserName.value = payload.userName
+      isAuthenticated.value = true
+    },
+    logout: () => {
+      isAuthenticated.value = false
+      token.value = ''
+      currentUserId.value = null
+      currentUserName.value = ''
+    },
     setTab,
     setActiveId,
     toggleTheme

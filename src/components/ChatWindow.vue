@@ -1,23 +1,22 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick, computed, watch } from 'vue'
-import { 
-  Send, 
-  Sparkles, 
-  Info, 
-  MoreVertical, 
-  Paperclip, 
-  Smile, 
+import { ref, onMounted, nextTick, computed, watch, onBeforeUnmount } from 'vue'
+import {
+  Send,
+  Sparkles,
+  Info,
+  MoreVertical,
+  Paperclip,
   ImageIcon,
   Circle,
-  FileCode,
   FileText,
   Wrench,
   Cpu,
   Zap,
-  Box
+  Check,
+  Trash2
 } from 'lucide-vue-next'
-import { getAIResponse } from '../services/gemini'
 import { useAppStore } from '../stores/app'
+import { getWsUrl } from '../services/backend'
 
 const store = useAppStore()
 
@@ -25,12 +24,21 @@ const props = defineProps<{
   chatId: string
 }>()
 
-const messages = ref([
-  { id: 1, role: 'model', text: 'Hello! I am Muse, your personal AI assistant. How can I help you today?', time: '10:00' }
-])
+type Role = 'user' | 'model'
+type UIMessage = { id: number; role: Role; text: string; time: string }
+type IncomingWSMessage = {
+  from?: string
+  content?: string
+  chat_type?: string
+}
+
+const ws = ref<WebSocket | null>(null)
+const wsError = ref('')
+const messageMap = ref<Record<string, UIMessage[]>>({})
+const messages = ref<UIMessage[]>([])
 
 const inputText = ref('')
-const isTyping = ref(false)
+const isTyping = ref(false) // 仅用于 AI 流式展示的占位态
 const isFocused = ref(false)
 const scrollContainer = ref<HTMLElement | null>(null)
 
@@ -40,6 +48,11 @@ const showToolsMenu = ref(false)
 const showModelMenu = ref(false)
 
 const isAI = computed(() => store.activeTab === 'ai' || props.chatId.startsWith('ai'))
+const activeReceiverId = computed(() => {
+  if (isAI.value) return -1
+  const chat = store.chats.find((c: any) => c.id === props.chatId)
+  return Number(chat?.userId || 0)
+})
 
 const activeChat = computed(() => {
   if (isAI.value) {
@@ -94,47 +107,136 @@ const scrollToBottom = async () => {
   }
 }
 
+const defaultGreeting = (): UIMessage => ({
+  id: Date.now(),
+  role: 'model',
+  text: `Hello! I am ${activeChat.value.name}. How can I help you today?`,
+  time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+})
+
+const ensureConversation = (chatId: string) => {
+  if (!messageMap.value[chatId]) {
+    messageMap.value[chatId] = isAI.value ? [defaultGreeting()] : []
+  }
+  messages.value = messageMap.value[chatId]
+}
+
+const addMessage = (chatId: string, msg: UIMessage) => {
+  if (!messageMap.value[chatId]) {
+    messageMap.value[chatId] = []
+  }
+  messageMap.value[chatId].push(msg)
+  if (props.chatId === chatId) {
+    messages.value = messageMap.value[chatId]
+    scrollToBottom()
+  }
+}
+
+const connectWs = () => {
+  if (!store.token) return
+  if (ws.value && ws.value.readyState === WebSocket.OPEN) return
+
+  ws.value = new WebSocket(getWsUrl(store.token))
+
+  ws.value.onopen = () => {
+    wsError.value = ''
+  }
+
+  ws.value.onmessage = (event) => {
+    let payload: IncomingWSMessage = {}
+    try {
+      payload = JSON.parse(event.data)
+    } catch {
+      return
+    }
+
+    if (payload.chat_type === 'ai_chunk') {
+      const currentList = messageMap.value[props.chatId] || []
+      const last = currentList[currentList.length - 1]
+      if (last && last.role === 'model') {
+        last.text += payload.content || ''
+      } else {
+        addMessage(props.chatId, {
+          id: Date.now(),
+          role: 'model',
+          text: payload.content || '',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        })
+      }
+      isTyping.value = false
+      return
+    }
+
+    if (payload.chat_type === 'ai_end') {
+      isTyping.value = false
+      return
+    }
+
+    if (payload.from && payload.content) {
+      const sender = Number(payload.from)
+      const targetChat = store.chats.find((c: any) => c.userId === sender)?.id || `user-${sender}`
+      addMessage(targetChat, {
+        id: Date.now(),
+        role: 'model',
+        text: payload.content,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      })
+    }
+  }
+
+  ws.value.onerror = () => {
+    wsError.value = 'WebSocket 连接失败，请确认后端网关可访问'
+  }
+}
+
 const sendMessage = async () => {
   if (!inputText.value.trim() || isTyping.value) return
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
+    wsError.value = '连接未建立，请稍后重试'
+    return
+  }
+  if (!activeReceiverId.value) {
+    wsError.value = '当前会话缺少接收者 ID'
+    return
+  }
 
   const userMsg = inputText.value
-  messages.value.push({
+  addMessage(props.chatId, {
     id: Date.now(),
     role: 'user',
     text: userMsg,
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   })
   inputText.value = ''
-  scrollToBottom()
+
+  ws.value.send(JSON.stringify({
+    chat_type: 'single_chat',
+    receiver: activeReceiverId.value,
+    message: userMsg
+  }))
 
   if (isAI.value) {
     isTyping.value = true
-    const history = messages.value.slice(0, -1).map(m => ({
-      role: m.role as 'user' | 'model',
-      parts: [{ text: m.text }]
-    }))
-
-    const response = await getAIResponse(userMsg, history)
-    messages.value.push({
-      id: Date.now() + 1,
-      role: 'model',
-      text: response || "I'm sorry, I couldn't process that request.",
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    })
-    isTyping.value = false
-    scrollToBottom()
   }
 }
 
 watch(() => props.chatId, () => {
-  if (isAI.value) {
-     messages.value = [
-      { id: 1, role: 'model', text: `Hello! I am ${activeChat.value.name}. I'm using ${selectedModel.value} today. How can I help?`, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
-    ]
-  }
+  ensureConversation(props.chatId)
 })
 
-onMounted(() => scrollToBottom())
+watch(() => store.isAuthenticated, (authed) => {
+  if (authed) connectWs()
+})
+
+onMounted(() => {
+  ensureConversation(props.chatId)
+  connectWs()
+  scrollToBottom()
+})
+
+onBeforeUnmount(() => {
+  ws.value?.close()
+})
 </script>
 
 <template>
@@ -284,6 +386,9 @@ onMounted(() => scrollToBottom())
       ref="scrollContainer" 
       class="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar relative"
     >
+      <div v-if="wsError" class="text-xs font-semibold text-red-500">
+        {{ wsError }}
+      </div>
       <div 
         v-for="msg in messages" 
         :key="msg.id"
