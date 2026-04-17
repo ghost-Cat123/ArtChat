@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, computed, watch } from 'vue'
 import { 
   Send, 
   Sparkles, 
@@ -14,10 +14,12 @@ import {
   Wrench,
   Cpu,
   Zap,
-  Box
+  Box,
+  Check,
+  Trash2
 } from 'lucide-vue-next'
-import { getAIResponse } from '../services/gemini'
 import { useAppStore } from '../stores/app'
+import { imSocket, type IMIncomingMessage } from '../services/imSocket'
 
 const store = useAppStore()
 
@@ -25,14 +27,19 @@ const props = defineProps<{
   chatId: string
 }>()
 
-const messages = ref([
-  { id: 1, role: 'model', text: 'Hello! I am Muse, your personal AI assistant. How can I help you today?', time: '10:00' }
-])
+type ChatRole = 'user' | 'model'
+type ChatMessage = { id: number; role: ChatRole; text: string; time: string }
+
+const messageMap = ref<Record<string, ChatMessage[]>>({})
 
 const inputText = ref('')
 const isTyping = ref(false)
 const isFocused = ref(false)
 const scrollContainer = ref<HTMLElement | null>(null)
+const wsConnected = ref(false)
+const wsHint = ref('')
+const currentAIReplyId = ref<number | null>(null)
+const activeAIChatId = ref<string>('ai-assistant')
 
 // Dropdown states
 const showAttachMenu = ref(false)
@@ -84,6 +91,24 @@ const contactsByCat: Record<string, any[]> = {
 const selectedModel = ref('Gemini 1.5 Pro')
 const selectedTool = ref('Default Vision')
 
+const nowTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+const messages = computed<ChatMessage[]>(() => {
+  if (!messageMap.value[props.chatId]) {
+    messageMap.value[props.chatId] = [
+      {
+        id: Date.now(),
+        role: 'model',
+        text: isAI.value
+          ? `Hello! I am ${activeChat.value.name}. I am connected to your go-im-system backend now.`
+          : '连接已建立后，你可以开始发送消息。',
+        time: nowTime()
+      }
+    ]
+  }
+  return messageMap.value[props.chatId]
+})
+
 const scrollToBottom = async () => {
   await nextTick()
   if (scrollContainer.value) {
@@ -102,39 +127,134 @@ const sendMessage = async () => {
     id: Date.now(),
     role: 'user',
     text: userMsg,
-    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    time: nowTime()
   })
   inputText.value = ''
   scrollToBottom()
 
-  if (isAI.value) {
-    isTyping.value = true
-    const history = messages.value.slice(0, -1).map(m => ({
-      role: m.role as 'user' | 'model',
-      parts: [{ text: m.text }]
-    }))
-
-    const response = await getAIResponse(userMsg, history)
+  if (!imSocket.isConnected()) {
     messages.value.push({
       id: Date.now() + 1,
       role: 'model',
-      text: response || "I'm sorry, I couldn't process that request.",
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      text: '后端连接未建立，请先配置 token 并刷新页面。',
+      time: nowTime()
     })
-    isTyping.value = false
-    scrollToBottom()
+    return
+  }
+
+  try {
+    if (isAI.value) {
+      activeAIChatId.value = props.chatId
+      currentAIReplyId.value = null
+      isTyping.value = true
+      imSocket.sendSingleChat(-1, userMsg)
+      return
+    }
+    const chat = store.chats.find((c: any) => c.id === props.chatId)
+    if (!chat?.backendUserId) {
+      throw new Error('当前会话未配置 backendUserId')
+    }
+    imSocket.sendSingleChat(chat.backendUserId, userMsg)
+  } catch (error) {
+    messages.value.push({
+      id: Date.now() + 1,
+      role: 'model',
+      text: `发送失败：${error instanceof Error ? error.message : '未知错误'}`,
+      time: nowTime()
+    })
   }
 }
 
-watch(() => props.chatId, () => {
-  if (isAI.value) {
-     messages.value = [
-      { id: 1, role: 'model', text: `Hello! I am ${activeChat.value.name}. I'm using ${selectedModel.value} today. How can I help?`, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
-    ]
+const pushIncomingText = (chatId: string, text: string) => {
+  if (!messageMap.value[chatId]) {
+    messageMap.value[chatId] = []
   }
+  messageMap.value[chatId].push({
+    id: Date.now() + Math.floor(Math.random() * 1000),
+    role: 'model',
+    text,
+    time: nowTime()
+  })
+}
+
+const handleIncoming = (payload: IMIncomingMessage) => {
+  if (payload.chat_type === 'ai_chunk') {
+    const chatId = activeAIChatId.value || 'ai-assistant'
+    if (!messageMap.value[chatId]) {
+      messageMap.value[chatId] = []
+    }
+    if (!currentAIReplyId.value) {
+      const id = Date.now() + 1
+      currentAIReplyId.value = id
+      messageMap.value[chatId].push({
+        id,
+        role: 'model',
+        text: payload.content || '',
+        time: nowTime()
+      })
+    } else {
+      const target = messageMap.value[chatId].find(m => m.id === currentAIReplyId.value)
+      if (target) target.text += payload.content || ''
+    }
+    scrollToBottom()
+    return
+  }
+
+  if (payload.chat_type === 'ai_end') {
+    isTyping.value = false
+    currentAIReplyId.value = null
+    scrollToBottom()
+    return
+  }
+
+  const fromId = Number(payload.from)
+  if (!Number.isNaN(fromId) && payload.content) {
+    const targetChat = store.getChatByBackendUserId(fromId)
+    if (targetChat) {
+      pushIncomingText(targetChat.id, payload.content)
+      if (store.activeId !== targetChat.id && store.activeTab === 'messages') {
+        targetChat.lastMsg = payload.content
+      }
+      scrollToBottom()
+      return
+    }
+  }
+}
+
+onMounted(() => {
+  const backendBase = import.meta.env.VITE_IM_BASE_URL || 'ws://127.0.0.1:8080'
+  const token = localStorage.getItem('im_token') || import.meta.env.VITE_IM_TOKEN || ''
+
+  if (!token) {
+    wsHint.value = '未找到 token。请先 localStorage.setItem("im_token", "你的登录token")'
+  } else {
+    try {
+      imSocket.connect(backendBase, token)
+    } catch (error) {
+      wsHint.value = error instanceof Error ? error.message : '连接失败'
+    }
+  }
+
+  const offMessage = imSocket.onMessage(handleIncoming)
+  const offConnection = imSocket.onConnectionChange((connected) => {
+    wsConnected.value = connected
+    if (connected) {
+      wsHint.value = ''
+    } else if (!wsHint.value) {
+      wsHint.value = 'WebSocket 已断开，请检查 go-im-system 网关'
+    }
+  })
+
+  scrollToBottom()
+  onUnmounted(() => {
+    offMessage()
+    offConnection()
+  })
 })
 
-onMounted(() => scrollToBottom())
+watch(() => props.chatId, () => {
+  scrollToBottom()
+})
 </script>
 
 <template>
@@ -276,6 +396,15 @@ onMounted(() => scrollToBottom())
         <button class="p-3 rounded-full transition-all hover:bg-slate-100 dark:hover:bg-slate-800">
           <MoreVertical class="w-6 h-6 text-slate-400" />
         </button>
+      </div>
+    </div>
+
+    <div v-if="wsHint || !wsConnected" class="px-10 pt-4">
+      <div
+        class="rounded-2xl px-4 py-3 text-xs font-semibold"
+        :class="store.isDark ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20' : 'bg-amber-50 text-amber-700 border border-amber-200'"
+      >
+        {{ wsHint || '正在连接 go-im-system 网关...' }}
       </div>
     </div>
 
