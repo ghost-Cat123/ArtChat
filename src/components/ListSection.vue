@@ -18,8 +18,7 @@ import {
   LayoutGrid,
   Filter,
   CheckCircle2,
-  Bell,
-  History
+  Bell
 } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 

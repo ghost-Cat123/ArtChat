@@ -4,6 +4,7 @@ import { ref, watch, computed } from 'vue'
 export type NavTab = 'messages' | 'contacts' | 'ai'
 
 export const useAppStore = defineStore('app', () => {
+  const isAuthenticated = ref(false)
   const isSidebarExpanded = ref(false)
   const activeTab = ref<NavTab>('messages')
   const activeId = ref('ai-assistant')
@@ -16,10 +17,10 @@ export const useAppStore = defineStore('app', () => {
   ])
 
   const chats = ref([
-    { id: 'chat-1', backendUserId: 1001, name: 'Design Team', lastMsg: 'The new minimalist UI looks great!', time: '10:24', avatar: '🎨', online: true, pinned: false },
-    { id: 'chat-2', backendUserId: 1002, name: 'Emily Davis', lastMsg: 'Are we still meeting at 2 PM?', time: 'Yesterday', avatar: '👩‍💻', online: true, pinned: false },
-    { id: 'chat-3', backendUserId: 1003, name: 'John Doe', lastMsg: 'Attached the project documentation.', time: 'Monday', avatar: '👨‍💼', online: false, pinned: false },
-    { id: 'chat-4', backendUserId: 1004, name: 'Art & Tech Hub', lastMsg: 'Check out the latest AI tools.', time: 'Oct 24', avatar: '🚀', online: false, pinned: false },
+    { id: 'chat-1', name: 'Design Team', lastMsg: 'The new minimalist UI looks great!', time: '10:24', avatar: '🎨', online: true, pinned: false },
+    { id: 'chat-2', name: 'Emily Davis', lastMsg: 'Are we still meeting at 2 PM?', time: 'Yesterday', avatar: '👩‍💻', online: true, pinned: false },
+    { id: 'chat-3', name: 'John Doe', lastMsg: 'Attached the project documentation.', time: 'Monday', avatar: '👨‍💼', online: false, pinned: false },
+    { id: 'chat-4', name: 'Art & Tech Hub', lastMsg: 'Check out the latest AI tools.', time: 'Oct 24', avatar: '🚀', online: false, pinned: false },
   ])
 
   const contactCategories = ref([
@@ -147,11 +148,8 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  const getChatByBackendUserId = (backendUserId: number) => {
-    return chats.value.find(c => c.backendUserId === backendUserId)
-  }
-
   return {
+    isAuthenticated,
     isSidebarExpanded,
     activeTab,
     activeId,
@@ -175,9 +173,10 @@ export const useAppStore = defineStore('app', () => {
     sortedAIHistory,
     sortedChats,
     toggleSidebar,
+    login: () => isAuthenticated.value = true,
+    logout: () => isAuthenticated.value = false,
     setTab,
     setActiveId,
-    toggleTheme,
-    getChatByBackendUserId
+    toggleTheme
   }
 })

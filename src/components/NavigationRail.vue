@@ -86,29 +86,37 @@ const isNavActive = (id: string) => store.activeTab === id
     </div>
 
     <!-- Bottom Actions -->
-    <div class="p-4 space-y-4">
+    <div class="p-4 space-y-2">
       <div 
-        class="flex items-center cursor-pointer rounded-2xl transition-all duration-300"
+        class="flex items-center cursor-pointer rounded-2xl transition-all duration-300 group"
         :class="[
-          store.isSidebarExpanded ? 'px-4 py-3 gap-4' : 'justify-center p-3',
+          store.isSidebarExpanded ? 'px-4 py-3 gap-4' : 'justify-center p-3 relative',
           store.isDark ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-200 text-slate-500'
         ]"
       >
         <Settings class="w-6 h-6" />
         <span v-if="store.isSidebarExpanded" class="font-medium">Settings</span>
+        <!-- Tooltip -->
+        <div v-if="!store.isSidebarExpanded" class="absolute left-full ml-4 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap pointer-events-none z-50">Settings</div>
       </div>
 
       <div 
-        class="flex items-center cursor-pointer rounded-2xl transition-all duration-300"
+        @click="store.logout"
+        class="flex items-center cursor-pointer rounded-2xl transition-all duration-300 group"
         :class="[
-          store.isSidebarExpanded ? 'px-4 py-3 gap-4' : 'justify-center p-3',
-          store.isDark ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-200 text-slate-500'
+          store.isSidebarExpanded ? 'px-4 py-3 gap-4' : 'justify-center p-3 relative',
+          store.isDark ? 'hover:bg-red-900/40 text-red-400' : 'hover:bg-red-50 text-red-600'
         ]"
+        title="Log Out"
       >
-        <div class="w-8 h-8 shrink-0 rounded-full bg-blue-500 items-center justify-center flex text-white font-bold text-xs ring-2 ring-transparent transition-all group-hover:ring-blue-500/30">
-          JW
+        <div class="w-8 h-8 shrink-0 rounded-full items-center justify-center flex font-bold transition-all"
+             :class="store.isDark ? 'bg-slate-800 text-slate-300 group-hover:bg-red-500 group-hover:text-white' : 'bg-slate-300 text-slate-600 group-hover:bg-red-500 group-hover:text-white'">
+          <UserCircle v-if="!store.isSidebarExpanded" class="w-5 h-5" />
+          <span v-else>JW</span>
         </div>
-        <span v-if="store.isSidebarExpanded" class="font-medium truncate transition-opacity duration-300">James Wilson</span>
+        <span v-if="store.isSidebarExpanded" class="font-medium truncate transition-opacity duration-300">Log Out</span>
+        <!-- Tooltip for collapsed state -->
+        <div v-if="!store.isSidebarExpanded" class="absolute left-full ml-4 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap pointer-events-none z-50">Log Out</div>
       </div>
     </div>
   </div>

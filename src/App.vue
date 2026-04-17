@@ -3,6 +3,7 @@ import { useAppStore } from './stores/app'
 import NavigationRail from './components/NavigationRail.vue'
 import ListSection from './components/ListSection.vue'
 import ChatWindow from './components/ChatWindow.vue'
+import AuthView from './components/AuthView.vue'
 import { Sun, Moon } from 'lucide-vue-next'
 
 const store = useAppStore()
@@ -13,21 +14,27 @@ const store = useAppStore()
     class="h-screen w-full overflow-hidden flex font-sans relative transition-colors duration-500 selection:bg-blue-500/30"
     :class="store.isDark ? 'bg-slate-950 text-slate-200' : 'bg-slate-50 text-slate-900'"
   >
-    <!-- Navigation Rail (Far Left) -->
-    <NavigationRail />
+    <!-- Auth Screen -->
+    <Transition name="fade" mode="out-in">
+      <AuthView v-if="!store.isAuthenticated" class="absolute inset-0 z-40 bg-inherit" />
 
-    <!-- Main Content Area -->
-    <main class="flex-1 flex overflow-hidden relative">
-      <!-- List Section (Small Content) -->
-      <ListSection 
-        class="w-80 transition-all duration-500"
-      />
+      <!-- Main App Content -->
+      <div v-else class="flex flex-1 h-full relative z-10 w-full animate-in fade-in zoom-in-95 duration-700">
+        <!-- Navigation Rail (Far Left) -->
+        <NavigationRail />
 
-      <!-- Detail Section (Large Content) -->
-      <div class="flex-1 h-full overflow-hidden">
-        <ChatWindow :chat-id="store.activeId" />
+        <!-- Main Content Area -->
+        <main class="flex-1 flex overflow-hidden relative">
+          <!-- List Section (Small Content) -->
+          <ListSection class="w-80 transition-all duration-500" />
+
+          <!-- Detail Section (Large Content) -->
+          <div class="flex-1 h-full overflow-hidden">
+            <ChatWindow :chat-id="store.activeId" />
+          </div>
+        </main>
       </div>
-    </main>
+    </Transition>
 
     <!-- Global Theme Toggle Button (Floating Top Right) -->
     <button 
