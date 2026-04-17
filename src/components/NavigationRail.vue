@@ -105,10 +105,10 @@ const isNavActive = (id: string) => store.activeTab === id
           store.isDark ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-200 text-slate-500'
         ]"
       >
-        <div class="w-8 h-8 rounded-full bg-blue-500 items-center justify-center flex text-white font-bold text-xs">
+        <div class="w-8 h-8 shrink-0 rounded-full bg-blue-500 items-center justify-center flex text-white font-bold text-xs ring-2 ring-transparent transition-all group-hover:ring-blue-500/30">
           JW
         </div>
-        <span v-if="store.isSidebarExpanded" class="font-medium truncate">James Wilson</span>
+        <span v-if="store.isSidebarExpanded" class="font-medium truncate transition-opacity duration-300">James Wilson</span>
       </div>
     </div>
   </div>

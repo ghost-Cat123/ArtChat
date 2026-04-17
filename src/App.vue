@@ -32,14 +32,14 @@ const store = useAppStore()
     <!-- Global Theme Toggle Button (Floating Top Right) -->
     <button 
       @click="store.toggleTheme"
-      class="fixed top-6 right-6 z-50 p-4 rounded-full backdrop-blur-3xl border transition-all duration-500 hover:scale-110 active:scale-95 shadow-2xl group overflow-hidden"
+      class="fixed h-12 w-12 top-6 right-10 z-50 flex items-center justify-center rounded-full backdrop-blur-3xl border transition-all duration-500 hover:scale-110 active:scale-95 shadow-2xl group overflow-hidden"
       :class="store.isDark ? 'bg-slate-900/50 border-slate-700 text-yellow-400' : 'bg-white/50 border-gray-200 text-blue-600'"
     >
       <!-- Glossy Effect -->
       <div class="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
       
-      <Sun v-if="store.isDark" class="w-6 h-6 relative z-10" />
-      <Moon v-else class="w-6 h-6 relative z-10" />
+      <Sun v-if="store.isDark" class="w-5 h-5 relative z-10" />
+      <Moon v-else class="w-5 h-5 relative z-10" />
     </button>
   </div>
 </template>

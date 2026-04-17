@@ -118,17 +118,18 @@ const isBatchMode = ref(false)
           <button 
             v-if="store.activeTab === 'ai'"
             @click="store.createNewAIChat"
-            class="p-2 rounded-full transition-all bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:scale-110 active:scale-95"
+            class="p-2 rounded-full transition-all hover:scale-110 active:scale-95"
+            :class="store.isDark ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'"
             title="New AI Chat"
           >
-            <PlusCircle class="w-5 h-5" />
+            <Plus class="w-5 h-5" />
           </button>
 
           <button 
             v-if="store.activeTab === 'contacts'"
             @click="showAddMenu = !showAddMenu"
-            class="p-2 rounded-full transition-all hover:scale-110"
-            :class="store.isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'"
+            class="p-2 rounded-full transition-all hover:scale-110 active:scale-95"
+            :class="store.isDark ? (showAddMenu ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700') : (showAddMenu ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900')"
           >
             <Plus class="w-5 h-5" />
           </button>

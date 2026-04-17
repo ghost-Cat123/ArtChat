@@ -269,7 +269,7 @@ onMounted(() => scrollToBottom())
         </div>
       </div>
       
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3 pr-16 border-r" :class="store.isDark ? 'border-slate-800' : 'border-slate-200'">
         <button class="p-3 rounded-full transition-all hover:bg-slate-100 dark:hover:bg-slate-800">
           <Info class="w-6 h-6 text-slate-400" />
         </button>
